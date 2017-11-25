@@ -1,35 +1,43 @@
 import sys
+import json
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QMainWindow, qApp, QAction, QPushButton
+from PyQt5.QtWidgets import QMainWindow, qApp
 from autobahn.twisted.wamp import ApplicationRunner, ApplicationSession
-from autobahn import wamp
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import Deferred
+from wamplay_ui import WAMPLayUI
 
 import qt5reactor
 
 
-class MainWindow(QMainWindow, ApplicationSession):
+class MainWindow(QMainWindow, ApplicationSession, WAMPLayUI):
 
     def __init__(self, config=None):
         QMainWindow.__init__(self)
         ApplicationSession.__init__(self, config)
 
-        test_button = QPushButton("Execute RPC", self)
-        test_button.move(50, 50)
-        test_button.clicked.connect(self.on_test_button_clicked)
+        self.setupUi(self)
+        self.current_topic = ""
+        self.push_button_call.clicked.connect(self.on_call_button_pressed)
 
-        self.setGeometry(300, 300, 300, 200)
-        self.setWindowTitle("Simple Menu")
-        self.show()
+    def response_to_string(resp):
+        return json.dumps(resp)
 
-    @inlineCallbacks
-    def whatever_test(self):
-        response = yield self.call(u"wamp.registration.list")
-        returnValue(response)
+    def on_call_button_pressed(self, event):
+        self.current_topic = self.line_edit_topic.text()
 
-    def on_test_button_clicked(self):
-        d = self.whatever_test()
-        d.addCallback(lambda x: print(x))
+        def errback_handler(fail=None, msg=None):
+            self.text_edit_response.setPlainText(fail.getErrorMessage())
+
+        d = Deferred()
+        try:
+            d = self.call(self.current_topic,
+                          json.loads(self.plainTextEdit.toPlainText()))
+        except Exception as e:
+            print(e.msg)
+
+        d.addCallback(MainWindow.response_to_string)
+        d.addCallback(self.text_edit_response.setPlainText)
+        d.addErrback(errback_handler)
 
     def closeEvent(self, event):
         self.leave()
@@ -40,10 +48,6 @@ class MainWindow(QMainWindow, ApplicationSession):
         if reactor.threadpool is not None:
             reactor.threadpool.stop()
         qApp.quit()
-
-    @wamp.register(u"com.rlang.test_function")
-    def test_function(data):
-        print(data)
 
 
 def make(config):
