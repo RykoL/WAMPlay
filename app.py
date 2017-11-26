@@ -1,7 +1,7 @@
 import sys
 import json
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QMainWindow, qApp
+from PyQt5.QtWidgets import QMainWindow, qApp, QInputDialog
 from autobahn.twisted.wamp import ApplicationRunner, ApplicationSession
 from twisted.internet.defer import Deferred
 from wamplay_ui import WAMPLayUI
@@ -18,6 +18,15 @@ class MainWindow(QMainWindow, ApplicationSession, WAMPLayUI):
         self.setupUi(self)
         self.current_topic = ""
         self.push_button_call.clicked.connect(self.on_call_button_pressed)
+        self.actionConnect.triggered.connect(self.show_connection_dialog)
+
+    def show_connection_dialog(self):
+        ok, ip_address = QInputDialog.getText(self,
+                                              "Connection setting",
+                                              "Enter the server address")
+        if ok:
+            self.server_address = ip_address
+            self._transport.close()
 
     def response_to_string(resp):
         return json.dumps(resp)
