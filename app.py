@@ -3,9 +3,8 @@ import json
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QMainWindow, qApp, QInputDialog
 from autobahn.twisted.wamp import ApplicationRunner, ApplicationSession
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, inlineCallbacks
 from wamplay_ui import WAMPLayUI
-from connection_dialog import ConnectionDialog
 import argparse
 import qt5reactor
 
@@ -18,17 +17,20 @@ class MainWindow(QMainWindow, ApplicationSession, WAMPLayUI):
 
         self.setupUi(self)
         self.current_topic = ""
-        self.push_button_call.clicked.connect(self.on_call_button_pressed)
-        self.actionConnect.triggered.connect(self.show_connection_dialog)
-
-    def show_connection_dialog(self):
-        print("Couldn't find a solution to change the connection yet")
+        self.button_subscribe.clicked.connect(self.on_subscribe_button_pressed)
+        self.button_call.clicked.connect(self.on_call_button_pressed)
+        self.button_publish.clicked.connect(self.on_publish_button_pressed)
+        self.last_subscription = None
 
     def response_to_string(resp):
         return json.dumps(resp)
 
     def on_call_button_pressed(self, event):
-        self.current_topic = self.line_edit_topic.text()
+        self.current_topic = self.line_edit_call_topic.text()
+        data = ""
+
+        if not self.text_edit_call_data.toPlainText:
+            data = json.loads(self.text_edit_call_data.toPlainText())
 
         def errback_handler(fail=None, msg=None):
             self.text_edit_response.setPlainText(fail.getErrorMessage())
@@ -36,13 +38,33 @@ class MainWindow(QMainWindow, ApplicationSession, WAMPLayUI):
         d = Deferred()
         try:
             d = self.call(self.current_topic,
-                          json.loads(self.plainTextEdit.toPlainText()))
+                          data)
         except Exception as e:
             print(e.msg)
 
         d.addCallback(MainWindow.response_to_string)
-        d.addCallback(self.text_edit_response.setPlainText)
+        d.addCallback(self.text_edit_call_response.setPlainText)
         d.addErrback(errback_handler)
+
+    @inlineCallbacks
+    def on_subscribe_button_pressed(self, event):
+        topic = self.line_edit_subscription_topic.text()
+
+        if self.last_subscription is not None:
+            self.last_subscription.unsubscribe()
+
+        self.last_subscription = yield \
+            self.subscribe(self.on_subscribtion_data_received, topic)
+
+    def on_subscribtion_data_received(self, data):
+        self.text_edit_subscription_response.appendPlainText(data)
+
+    @inlineCallbacks
+    def on_publish_button_pressed(self, event):
+        topic = self.line_edit_publish_topic.text()
+        data = self.text_edit_publish_data.toPlainText()
+
+        yield self.publish(topic, data)
 
     def closeEvent(self, event):
         self.leave()
