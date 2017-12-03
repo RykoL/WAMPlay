@@ -5,7 +5,8 @@ from PyQt5.QtWidgets import QMainWindow, qApp, QInputDialog
 from autobahn.twisted.wamp import ApplicationRunner, ApplicationSession
 from twisted.internet.defer import Deferred
 from wamplay_ui import WAMPLayUI
-
+from connection_dialog import ConnectionDialog
+import argparse
 import qt5reactor
 
 
@@ -21,12 +22,7 @@ class MainWindow(QMainWindow, ApplicationSession, WAMPLayUI):
         self.actionConnect.triggered.connect(self.show_connection_dialog)
 
     def show_connection_dialog(self):
-        ok, ip_address = QInputDialog.getText(self,
-                                              "Connection setting",
-                                              "Enter the server address")
-        if ok:
-            self.server_address = ip_address
-            self._transport.close()
+        print("Couldn't find a solution to change the connection yet")
 
     def response_to_string(resp):
         return json.dumps(resp)
@@ -66,12 +62,21 @@ def make(config):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="GUI Tool to test wamp topics")
+    parser.add_argument("url", metavar="url",
+                        type=str, nargs='?', default="ws://127.0.0.1:8080/ws")
+    parser.add_argument("realm", metavar="realm",
+                        type=str, nargs='?', default="realm1")
+    parser.add_argument("--user", metavar="user", type=str)
+    parser.add_argument("--password", metavar="user", type=str)
+    args = parser.parse_args()
+    print(args.url)
 
     app = QtWidgets.QApplication(sys.argv)
     qt5reactor.install()
 
-    runner = ApplicationRunner(url=u"ws://192.168.178.52:8080",
-                               realm=u"realm1")
+    runner = ApplicationRunner(url=args.url,
+                               realm=args.realm)
     runner.run(make)
 
 
